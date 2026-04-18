@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'save_plan_screen.dart';
 import 'plan_screen.dart';
 
 class SurpriseScreen extends StatefulWidget {
@@ -400,7 +401,10 @@ class _SurpriseScreenState extends State<SurpriseScreen> {
                 icon: Icons.bookmark_outline_rounded,
                 label: 'Saved',
                 selected: false,
-                onTap: () {},
+                onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const SavePlanScreen()),
+                  ),
               ),
             ],
           ),

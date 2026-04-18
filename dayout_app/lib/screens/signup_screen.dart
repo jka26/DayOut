@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../services/auth_service.dart';
 import 'landing_screen.dart';
 import 'login_screen.dart';
 
@@ -16,6 +17,7 @@ class _SignUpScreenState extends State<SignUpScreen>
   late Animation<double> _fadeIn;
   late Animation<Offset> _slideUp;
 
+  final _nameCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   final _confirmPasswordCtrl = TextEditingController();
@@ -57,6 +59,7 @@ class _SignUpScreenState extends State<SignUpScreen>
   @override
   void dispose() {
     _controller.dispose();
+    _nameCtrl.dispose();
     _emailCtrl.dispose();
     _passwordCtrl.dispose();
     _confirmPasswordCtrl.dispose();
@@ -100,15 +103,21 @@ class _SignUpScreenState extends State<SignUpScreen>
       _errorMessage = null;
     });
 
-    // Simulate auth delay — replace with real auth logic
-    await Future.delayed(const Duration(seconds: 1));
+    final result = await AuthService.register(
+      name: _nameCtrl.text.trim(),
+      email: _emailCtrl.text.trim(),
+      password: _passwordCtrl.text,
+    );
 
+    if (!mounted) return;
     setState(() => _isLoading = false);
 
-    if (mounted) {
+    if (result.success) {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => const LandingScreen()),
       );
+    } else {
+      setState(() => _errorMessage = result.error ?? 'Registration failed. Please try again.');
     }
   }
 
@@ -231,6 +240,24 @@ class _SignUpScreenState extends State<SignUpScreen>
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
+                              // Display name
+                              const _FieldLabel(label: 'Display name'),
+                              const SizedBox(height: 10),
+                              _InputField(
+                                controller: _nameCtrl,
+                                hint: 'What should we call you?',
+                                icon: Icons.person_outline_rounded,
+                                keyboardType: TextInputType.name,
+                                validator: (v) {
+                                  if (v == null || v.trim().isEmpty) {
+                                    return 'Name is required';
+                                  }
+                                  return null;
+                                },
+                              ),
+
+                              const SizedBox(height: 16),
+
                               // Email
                               const _FieldLabel(label: 'Email address'),
                               const SizedBox(height: 10),

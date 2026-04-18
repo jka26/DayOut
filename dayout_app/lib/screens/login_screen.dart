@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../services/auth_service.dart';
 import 'landing_screen.dart';
 import 'welcome_screen.dart';
 
@@ -62,15 +63,20 @@ class _LoginScreenState extends State<LoginScreen>
       _errorMessage = null;
     });
 
-    // Simulate auth delay — replace with real auth logic
-    await Future.delayed(const Duration(seconds: 1));
+    final result = await AuthService.login(
+      email: _emailCtrl.text.trim(),
+      password: _passwordCtrl.text,
+    );
 
+    if (!mounted) return;
     setState(() => _isLoading = false);
 
-    if (mounted) {
+    if (result.success) {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => const LandingScreen()),
       );
+    } else {
+      setState(() => _errorMessage = result.error ?? 'Login failed. Please try again.');
     }
   }
 

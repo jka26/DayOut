@@ -203,7 +203,10 @@ class _SavePlanScreenState extends State<SavePlanScreen> {
                 icon: Icons.bookmark_rounded,
                 label: 'Saved',
                 selected: true,
-                onTap: () {},
+                onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const SavePlanScreen()),
+                  ),
               ),
             ],
           ),

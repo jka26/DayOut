@@ -3,6 +3,7 @@ import 'discover_screen.dart';
 import 'plan_screen.dart';
 import 'save_plan_screen.dart';
 import 'surprise_screen.dart';
+import '../services/auth_service.dart';
 
 class LandingScreen extends StatefulWidget {
   const LandingScreen({super.key});
@@ -17,10 +18,28 @@ class _LandingScreenState extends State<LandingScreen>
   late Animation<double> _fadeIn;
   late Animation<Offset> _slideUp;
   int _selectedNavIndex = 0;
+  String _displayName = '';
+
+  String get _greeting {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    return 'Good evening';
+  }
+
+  Future<void> _loadUser() async {
+    final user = await AuthService.me();
+    if (user != null && mounted) {
+      setState(() {
+        _displayName = (user['name'] as String? ?? '').split(' ').first;
+      });
+    }
+  }
 
   @override
   void initState() {
     super.initState();
+    _loadUser();
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 700),
@@ -71,7 +90,7 @@ class _LandingScreenState extends State<LandingScreen>
                         Row(
                           children: [
                             Text(
-                              'Good afternoon, Kofi ',
+                              '$_greeting${_displayName.isNotEmpty ? ', $_displayName' : ''} ',
                               style: TextStyle(
                                 fontSize: 14,
                                 color: Colors.white.withValues(alpha: 0.85),
@@ -386,7 +405,12 @@ class _LandingScreenState extends State<LandingScreen>
                   icon: Icons.home_rounded,
                   label: 'Home',
                   selected: _selectedNavIndex == 0,
-                  onTap: () => setState(() => _selectedNavIndex = 0),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const LandingScreen(),
+                    ),
+                  ),
                 ),
                 _NavItem(
                   icon: Icons.search_rounded,

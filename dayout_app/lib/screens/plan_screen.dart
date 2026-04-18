@@ -13,6 +13,7 @@ class PlanScreen extends StatefulWidget {
 
 class _PlanScreenState extends State<PlanScreen> {
   int _selectedVibe = -1;
+  int _currentStep = 1;
   final List<_PlaceData> _itinerary = [];
   final Map<_PlaceData, TimeOfDay?> _stopTimes = {};
   final Map<_PlaceData, DateTime?> _stopDates = {};
@@ -80,11 +81,15 @@ class _PlanScreenState extends State<PlanScreen> {
     setState(() {
       if (_itinerary.contains(place)) {
         _itinerary.remove(place);
+        if (_itinerary.isEmpty) _currentStep = 1;
       } else {
         _itinerary.add(place);
+        if (_currentStep < 2) _currentStep = 2;
       }
     });
   }
+
+  void _advanceToStep3() => setState(() => _currentStep = 3);
 
   @override
   Widget build(BuildContext context) {
@@ -167,9 +172,9 @@ class _PlanScreenState extends State<PlanScreen> {
                           color: Colors.white.withValues(alpha: 0.6)),
                       borderRadius: BorderRadius.circular(20),
                     ),
-                    child: const Text(
-                      'Step 1 of 3',
-                      style: TextStyle(
+                    child: Text(
+                      'Step $_currentStep of 3',
+                      style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                         color: Colors.white,
@@ -182,12 +187,11 @@ class _PlanScreenState extends State<PlanScreen> {
               // Step progress
               Row(
                 children: [
-                  _StepBubble(number: 1, label: 'Pick\nplaces', active: true),
-                  _StepLine(active: false),
-                  _StepBubble(number: 2, label: 'Set\ntimes', active: false),
-                  _StepLine(active: false),
-                  _StepBubble(
-                      number: 3, label: 'Invite\n& save', active: false),
+                  _StepBubble(number: 1, label: 'Pick\nplaces', active: _currentStep >= 1),
+                  _StepLine(active: _currentStep >= 2),
+                  _StepBubble(number: 2, label: 'Set\ntimes', active: _currentStep >= 2),
+                  _StepLine(active: _currentStep >= 3),
+                  _StepBubble(number: 3, label: 'Invite\n& save', active: _currentStep >= 3),
                 ],
               ),
             ],
@@ -528,8 +532,46 @@ class _PlanScreenState extends State<PlanScreen> {
               }).toList(),
             ),
           ),
-        if (_itinerary.isNotEmpty) _buildInviteFriends(),
+        if (_currentStep == 2 && _itinerary.isNotEmpty) _buildContinueButton(),
+        if (_currentStep >= 3) _buildInviteFriends(),
       ],
+    );
+  }
+
+  // ── Continue to step 3 ───────────────────────────────────────────────────
+
+  Widget _buildContinueButton() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+      child: GestureDetector(
+        onTap: _advanceToStep3,
+        child: Container(
+          height: 50,
+          decoration: BoxDecoration(
+            color: const Color(0xFF00C2CC).withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: const Color(0xFF00C2CC).withValues(alpha: 0.45),
+            ),
+          ),
+          child: const Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                'Continue to Invite & Save',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF00C2CC),
+                ),
+              ),
+              SizedBox(width: 8),
+              Icon(Icons.arrow_forward_rounded,
+                  color: Color(0xFF00C2CC), size: 18),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -725,7 +767,7 @@ class _PlanScreenState extends State<PlanScreen> {
   // ── Bottom bar ────────────────────────────────────────────────────────────
 
   Widget _buildBottomBar() {
-    final canSave = _itinerary.isNotEmpty;
+    final canSave = _itinerary.isNotEmpty && _currentStep >= 3;
     return Container(
       decoration: const BoxDecoration(
         color: Color(0xFF0D1825),
@@ -813,7 +855,11 @@ class _PlanScreenState extends State<PlanScreen> {
                   Text(
                     canSave
                         ? 'Plan will be saved offline — accessible without WiFi'
-                        : 'Add at least one stop to save the plan',
+                        : _itinerary.isEmpty
+                            ? 'Add at least one stop to continue'
+                            : _currentStep == 2
+                                ? 'Tap "Continue to Invite & Save" to reach Step 3'
+                                : 'Add at least one stop to save the plan',
                     style: const TextStyle(
                         fontSize: 12, color: Color(0xFF6B7280)),
                   ),

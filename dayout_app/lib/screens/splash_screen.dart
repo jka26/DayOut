@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
+import '../services/api_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -112,8 +113,10 @@ class _SplashScreenState extends State<SplashScreen>
     _exitController.forward();
 
     await Future.delayed(const Duration(milliseconds: 500));
+    final token = await ApiService.getToken();
     if (mounted) {
-      Navigator.pushReplacementNamed(context, '/welcome');
+      final route = (token != null && token.isNotEmpty) ? '/landing' : '/welcome';
+      Navigator.pushReplacementNamed(context, route);
     }
   }
 
