@@ -72,11 +72,18 @@ class ApiService {
       final responseBody = await response.transform(utf8.decoder).join();
       client.close();
 
-      final decoded = jsonDecode(responseBody);
-      if (decoded is Map<String, dynamic>) {
-        return decoded;
+      try {
+        final raw = jsonDecode(responseBody);
+        if (raw is Map<String, dynamic>) {
+          return raw;
+        }
+        return {'data': raw};
+      } catch (_) {
+        // Server returned non-JSON (HTML error page, redirect, etc.)
+        return {
+          'error': 'Server returned unexpected response (HTTP ${response.statusCode}). Check API_BASE_URL in .env.',
+        };
       }
-      return {'data': decoded};
     } on SocketException catch (e) {
       return {'error': 'Network error: $e'};
     } on HttpException catch (e) {
