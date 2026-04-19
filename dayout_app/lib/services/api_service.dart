@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -12,7 +13,7 @@ import '../config/env.dart';
 /// `{'error': 'Network error'}` is returned.
 class ApiService {
   static const _tokenKey = 'auth_token';
-  static const _timeout = Duration(seconds: 10);
+  static const _timeout = Duration(seconds: 30);
 
   // ── Token management ──────────────────────────────────────────────────────
 
@@ -80,14 +81,17 @@ class ApiService {
         return {'data': raw};
       } catch (_) {
         // Server returned non-JSON (HTML error page, redirect, etc.)
+        final preview = responseBody.length > 200 ? responseBody.substring(0, 200) : responseBody;
         return {
-          'error': 'Server returned unexpected response (HTTP ${response.statusCode}). Check API_BASE_URL in .env.',
+          'error': 'Non-JSON response (HTTP ${response.statusCode}): $preview',
         };
       }
     } on SocketException catch (e) {
       return {'error': 'Network error: $e'};
     } on HttpException catch (e) {
       return {'error': 'Network error: $e'};
+    } on TimeoutException {
+      return {'error': 'Request timed out. The server may be starting up — please try again.'};
     } catch (e) {
       return {'error': 'Error: $e'};
     }
