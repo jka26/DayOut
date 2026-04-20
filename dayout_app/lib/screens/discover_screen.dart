@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+import '../services/weather_service.dart';
+import '../services/places_service.dart';
 import 'food_match_screen.dart';
 import 'fun_facts_screen.dart';
 import 'plan_screen.dart';
@@ -15,6 +19,81 @@ class DiscoverScreen extends StatefulWidget {
 class _DiscoverScreenState extends State<DiscoverScreen> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
+  List<_PlaceData> _livePlaces = [];
+  bool _placesLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPlaces();
+  }
+
+  Future<void> _loadPlaces() async {
+    final weather = await WeatherService.fetchAccra();
+    final appPlaces = await PlacesService.fetchNearby(weather: weather);
+    if (!mounted) return;
+    setState(() {
+      _livePlaces = appPlaces.map((p) => _PlaceData(
+            name: p.name,
+            category: p.category,
+            distance: p.distanceStr,
+            rating: p.displayRating,
+            badge: p.badge,
+            badgeColor: _categoryColor(p.category),
+            gradientColors: _categoryGradient(p.category),
+            icon: _categoryIcon(p.category),
+            social: p.socialText,
+            lat: p.lat,
+            lng: p.lng,
+          )).toList();
+      _placesLoading = false;
+    });
+  }
+
+  static Color _categoryColor(String cat) {
+    switch (cat.toLowerCase()) {
+      case 'beach': return const Color(0xFF00C2CC);
+      case 'park': return const Color(0xFF22C55E);
+      case 'restaurant': return const Color(0xFFF59E0B);
+      case 'cafe': return const Color(0xFFD97706);
+      case 'museum': return const Color(0xFF6B7280);
+      case 'arcade': return const Color(0xFF7C3AED);
+      case 'shopping': return const Color(0xFF0891B2);
+      case 'nightlife': return const Color(0xFF1D4ED8);
+      case 'attraction': return const Color(0xFFEF4444);
+      default: return const Color(0xFF374151);
+    }
+  }
+
+  static List<Color> _categoryGradient(String cat) {
+    switch (cat.toLowerCase()) {
+      case 'beach': return [const Color(0xFF004D52), const Color(0xFF00C2CC)];
+      case 'park': return [const Color(0xFF064E3B), const Color(0xFF10B981)];
+      case 'restaurant': return [const Color(0xFF78350F), const Color(0xFFF59E0B)];
+      case 'cafe': return [const Color(0xFF92400E), const Color(0xFFD97706)];
+      case 'museum': return [const Color(0xFF374151), const Color(0xFF9CA3AF)];
+      case 'arcade': return [const Color(0xFF4C1D95), const Color(0xFF7C3AED)];
+      case 'shopping': return [const Color(0xFF0C4A6E), const Color(0xFF0891B2)];
+      case 'nightlife': return [const Color(0xFF1E1B4B), const Color(0xFF4F46E5)];
+      case 'attraction': return [const Color(0xFF7F1D1D), const Color(0xFFEF4444)];
+      default: return [const Color(0xFF1F2937), const Color(0xFF374151)];
+    }
+  }
+
+  static IconData _categoryIcon(String cat) {
+    switch (cat.toLowerCase()) {
+      case 'beach': return Icons.beach_access_rounded;
+      case 'park': return Icons.eco_rounded;
+      case 'restaurant': return Icons.restaurant_rounded;
+      case 'cafe': return Icons.coffee_rounded;
+      case 'museum': return Icons.museum_rounded;
+      case 'arcade': return Icons.sports_esports_rounded;
+      case 'shopping': return Icons.shopping_bag_rounded;
+      case 'nightlife': return Icons.nightlife_rounded;
+      case 'attraction': return Icons.place_rounded;
+      default: return Icons.location_on_rounded;
+    }
+  }
 
   static const _places = [
     _PlaceData(
@@ -136,10 +215,13 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     ),
   ];
 
+  List<_PlaceData> get _activeList =>
+      _livePlaces.isNotEmpty ? _livePlaces : _places;
+
   List<_PlaceData> get _filtered {
-    if (_searchQuery.isEmpty) return _places;
+    if (_searchQuery.isEmpty) return _activeList;
     final q = _searchQuery.toLowerCase();
-    return _places
+    return _activeList
         .where((p) =>
             p.name.toLowerCase().contains(q) ||
             p.category.toLowerCase().contains(q))
@@ -160,16 +242,24 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
         children: [
           _buildHeader(),
           Expanded(
-            child: _filtered.isEmpty
-                ? _buildEmptyState()
-                : ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                    itemCount: _filtered.length,
-                    itemBuilder: (context, i) => _PlaceCard(
-                      place: _filtered[i],
-                      onTap: () => _showLocationSheet(context, _filtered[i]),
+            child: _placesLoading
+                ? const Center(
+                    child: CircularProgressIndicator(
+                      color: Color(0xFF00C2CC),
+                      strokeWidth: 2,
                     ),
-                  ),
+                  )
+                : _filtered.isEmpty
+                    ? _buildEmptyState()
+                    : ListView.builder(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                        itemCount: _filtered.length,
+                        itemBuilder: (context, i) => _PlaceCard(
+                          place: _filtered[i],
+                          onTap: () =>
+                              _showLocationSheet(context, _filtered[i]),
+                        ),
+                      ),
           ),
           _buildBottomNav(context),
         ],
@@ -646,70 +736,77 @@ class _LocationSheet extends StatelessWidget {
               borderRadius: BorderRadius.circular(2),
             ),
           ),
-          // Map placeholder
+          // Real OSM map
           Container(
             margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
             height: 200,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(16),
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: place.gradientColors
-                    .map((c) => c.withValues(alpha: 0.25))
-                    .toList(),
-              ),
             ),
-            child: Stack(
-              children: [
-                // Grid lines to suggest a map
-                CustomPaint(
-                  size: const Size(double.infinity, 200),
-                  painter: _MapGridPainter(),
+            clipBehavior: Clip.hardEdge,
+            child: FlutterMap(
+              options: MapOptions(
+                initialCenter: LatLng(place.lat, place.lng),
+                initialZoom: 15,
+                interactionOptions: const InteractionOptions(
+                  flags: InteractiveFlag.none,
                 ),
-                // Pin marker
-                Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: place.gradientColors,
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: place.gradientColors.last
-                                  .withValues(alpha: 0.4),
-                              blurRadius: 12,
-                              offset: const Offset(0, 4),
+              ),
+              children: [
+                TileLayer(
+                  urlTemplate:
+                      'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  userAgentPackageName: 'com.dayout.app',
+                ),
+                MarkerLayer(
+                  markers: [
+                    Marker(
+                      point: LatLng(place.lat, place.lng),
+                      width: 48,
+                      height: 56,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 38,
+                            height: 38,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: place.gradientColors,
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: place.gradientColors.last
+                                      .withValues(alpha: 0.5),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
-                        child: Icon(place.icon,
-                            size: 22, color: Colors.white),
+                            child: Icon(place.icon,
+                                size: 18, color: Colors.white),
+                          ),
+                          Container(
+                            width: 2,
+                            height: 10,
+                            color: place.gradientColors.last,
+                          ),
+                          Container(
+                            width: 6,
+                            height: 6,
+                            decoration: BoxDecoration(
+                              color: place.gradientColors.last
+                                  .withValues(alpha: 0.5),
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ],
                       ),
-                      Container(
-                        width: 2,
-                        height: 12,
-                        color: place.gradientColors.last,
-                      ),
-                      Container(
-                        width: 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          color:
-                              place.gradientColors.last.withValues(alpha: 0.4),
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -831,26 +928,6 @@ class _LocationSheet extends StatelessWidget {
 }
 
 // ── Map grid painter ──────────────────────────────────────────────────────────
-
-class _MapGridPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.3)
-      ..strokeWidth = 1;
-
-    const step = 30.0;
-    for (double x = 0; x < size.width; x += step) {
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
-    }
-    for (double y = 0; y < size.height; y += step) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(_MapGridPainter old) => false;
-}
 
 // ── Data model ────────────────────────────────────────────────────────────────
 

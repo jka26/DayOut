@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import '../services/surprise_planner.dart';
 import 'save_plan_screen.dart';
 import 'plan_screen.dart';
+import 'surprise_result_screen.dart';
 
 class SurpriseScreen extends StatefulWidget {
   const SurpriseScreen({super.key});
@@ -38,10 +40,31 @@ class _SurpriseScreenState extends State<SurpriseScreen> {
     'No limit 🤙',
   ];
 
+  bool _loading = false;
+
   bool get _canSubmit =>
       _selectedVibes.isNotEmpty &&
       _selectedTime != null &&
       _selectedBudget != null;
+
+  Future<void> _generate() async {
+    setState(() => _loading = true);
+    // Brief delay for effect
+    await Future.delayed(const Duration(milliseconds: 900));
+    if (!mounted) return;
+    setState(() => _loading = false);
+
+    final plan = SurprisePlannerService.generate(
+      vibeIndices: _selectedVibes,
+      timeIndex: _selectedTime!,
+      budgetIndex: _selectedBudget!,
+    );
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => SurpriseResultScreen(plan: plan)),
+    );
+  }
 
   @override
   void dispose() {
@@ -81,7 +104,7 @@ class _SurpriseScreenState extends State<SurpriseScreen> {
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
                     child: GestureDetector(
-                      onTap: _canSubmit ? () {} : null,
+                      onTap: _canSubmit && !_loading ? _generate : null,
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 200),
                         height: 52,
@@ -96,29 +119,38 @@ class _SurpriseScreenState extends State<SurpriseScreen> {
                           color: _canSubmit ? null : const Color(0xFFD1D5DB),
                           borderRadius: BorderRadius.circular(26),
                         ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.auto_awesome_rounded,
-                              size: 18,
-                              color: _canSubmit
-                                  ? Colors.white
-                                  : const Color(0xFF9CA3AF),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Surprise Me!',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w800,
-                                color: _canSubmit
-                                    ? Colors.white
-                                    : const Color(0xFF9CA3AF),
+                        child: _loading
+                            ? const SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.5,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.auto_awesome_rounded,
+                                    size: 18,
+                                    color: _canSubmit
+                                        ? Colors.white
+                                        : const Color(0xFF9CA3AF),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Surprise Me!',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w800,
+                                      color: _canSubmit
+                                          ? Colors.white
+                                          : const Color(0xFF9CA3AF),
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ),
-                          ],
-                        ),
                       ),
                     ),
                   ),

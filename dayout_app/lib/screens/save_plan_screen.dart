@@ -285,18 +285,34 @@ class _PlanCard extends StatelessWidget {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF00C2CC).withValues(alpha: 0.1),
+                    color: plan.isSurprise
+                        ? const Color(0xFFF59E0B).withValues(alpha: 0.1)
+                        : const Color(0xFF00C2CC).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                        color: const Color(0xFF00C2CC).withValues(alpha: 0.3)),
+                        color: plan.isSurprise
+                            ? const Color(0xFFF59E0B).withValues(alpha: 0.4)
+                            : const Color(0xFF00C2CC).withValues(alpha: 0.3)),
                   ),
-                  child: const Text(
-                    'Offline',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF00C2CC),
-                    ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (plan.isSurprise) ...[
+                        const Icon(Icons.auto_awesome_rounded,
+                            size: 11, color: Color(0xFFF59E0B)),
+                        const SizedBox(width: 4),
+                      ],
+                      Text(
+                        plan.isSurprise ? 'Surprise' : 'Offline',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: plan.isSurprise
+                              ? const Color(0xFFF59E0B)
+                              : const Color(0xFF00C2CC),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -370,7 +386,8 @@ class _PlanCard extends StatelessWidget {
                   child: GestureDetector(
                     onTap: () => Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => const PlanScreen()),
+                      MaterialPageRoute(
+                          builder: (_) => PlanScreen(initialPlan: plan)),
                     ),
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 10),
@@ -381,11 +398,11 @@ class _PlanCard extends StatelessWidget {
                       child: const Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.open_in_new_rounded,
+                          Icon(Icons.edit_rounded,
                               size: 14, color: Color(0xFF00C2CC)),
                           SizedBox(width: 6),
                           Text(
-                            'Open Plan',
+                            'Edit Plan',
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,

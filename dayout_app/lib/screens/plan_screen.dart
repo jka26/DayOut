@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_contacts/flutter_contacts.dart';
 import '../models/plan_store.dart';
 import 'food_match_screen.dart';
 import 'fun_facts_screen.dart';
 import 'save_plan_screen.dart';
 
 class PlanScreen extends StatefulWidget {
-  const PlanScreen({super.key});
+  final SavedPlan? initialPlan;
+  const PlanScreen({super.key, this.initialPlan});
 
   @override
   State<PlanScreen> createState() => _PlanScreenState();
@@ -17,10 +19,39 @@ class _PlanScreenState extends State<PlanScreen> {
   final List<_PlaceData> _itinerary = [];
   final Map<_PlaceData, TimeOfDay?> _stopTimes = {};
   final Map<_PlaceData, DateTime?> _stopDates = {};
-  final List<_FriendAvatar> _invitedFriends = [
-    _FriendAvatar(initials: 'KA', color: Color(0xFF00C2CC)),
-    _FriendAvatar(initials: 'EB', color: Color(0xFFE91E8C)),
+  final List<_FriendData> _invitedFriends = [];
+  String? _editingPlanId;
+
+  static const _avatarColors = [
+    Color(0xFF00C2CC), Color(0xFFE91E8C), Color(0xFF7C3AED),
+    Color(0xFFF59E0B), Color(0xFF22C55E), Color(0xFFEF4444),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    final plan = widget.initialPlan;
+    if (plan != null) {
+      _editingPlanId = plan.id;
+      _currentStep = 3;
+      for (final s in plan.stops) {
+        _itinerary.add(_PlaceData.fromStop(s));
+      }
+      for (var i = 0; i < plan.friendNames.length; i++) {
+        final name = plan.friendNames[i];
+        final parts = name.trim().split(' ');
+        final initials = parts.length >= 2
+            ? '${parts[0][0]}${parts[1][0]}'.toUpperCase()
+            : name.substring(0, name.length.clamp(0, 2)).toUpperCase();
+        _invitedFriends.add(_FriendData(
+          id: 'restored_$i',
+          name: name,
+          initials: initials,
+          color: _avatarColors[i % _avatarColors.length],
+        ));
+      }
+    }
+  }
 
   static const _vibes = [
     _VibeData(icon: Icons.apps_rounded, label: 'All'),
@@ -407,8 +438,8 @@ class _PlanScreenState extends State<PlanScreen> {
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: const Color(0xFF243447)),
             ),
-            child: Column(
-              children: const [
+            child: const Column(
+              children: [
                 Icon(Icons.calendar_today_outlined,
                     size: 34, color: Color(0xFF374151)),
                 SizedBox(height: 12),
@@ -577,6 +608,42 @@ class _PlanScreenState extends State<PlanScreen> {
 
   // ── Invite friends ────────────────────────────────────────────────────────
 
+  Future<void> _pickContacts() async {
+    final granted = await FlutterContacts.requestPermission();
+    if (!granted) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Contacts permission denied')),
+        );
+      }
+      return;
+    }
+    final contacts = await FlutterContacts.getContacts();
+    if (!mounted) return;
+
+    final selectedIds = _invitedFriends.map((f) => f.id).toSet();
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF162030),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => _ContactPickerSheet(
+        contacts: contacts,
+        selectedIds: selectedIds,
+        avatarColors: _avatarColors,
+        onDone: (picked) {
+          setState(() {
+            _invitedFriends.clear();
+            _invitedFriends.addAll(picked);
+          });
+        },
+      ),
+    );
+  }
+
   Widget _buildInviteFriends() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
@@ -593,48 +660,75 @@ class _PlanScreenState extends State<PlanScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          Row(
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              ..._invitedFriends.map((f) => Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: f.color,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Center(
-                        child: Text(
-                          f.initials,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
+              ..._invitedFriends.map((f) => GestureDetector(
+                    onTap: () => setState(() => _invitedFriends.remove(f)),
+                    child: Stack(
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: f.color,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Center(
+                            child: Text(
+                              f.initials,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
+                            ),
                           ),
                         ),
-                      ),
+                        Positioned(
+                          right: 0,
+                          top: 0,
+                          child: Container(
+                            width: 14,
+                            height: 14,
+                            decoration: const BoxDecoration(
+                              color: Color(0xFFEF4444),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.close_rounded,
+                                size: 9, color: Colors.white),
+                          ),
+                        ),
+                      ],
                     ),
                   )),
-              // Add button
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: const Color(0xFF374151),
-                    width: 1.5,
-                    strokeAlign: BorderSide.strokeAlignInside,
+              GestureDetector(
+                onTap: _pickContacts,
+                child: Container(
+                  height: 40,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: const Color(0xFF00C2CC).withValues(alpha: 0.5),
+                    ),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.person_add_alt_1_rounded,
+                          size: 16, color: Color(0xFF00C2CC)),
+                      SizedBox(width: 6),
+                      Text(
+                        'Add from contacts',
+                        style: TextStyle(
+                            fontSize: 13, color: Color(0xFF00C2CC)),
+                      ),
+                    ],
                   ),
                 ),
-                child: const Icon(Icons.add_rounded,
-                    size: 18, color: Color(0xFF6B7280)),
-              ),
-              const SizedBox(width: 10),
-              const Text(
-                'Add from contacts',
-                style: TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
               ),
             ],
           ),
@@ -747,15 +841,26 @@ class _PlanScreenState extends State<PlanScreen> {
           ? 'My Plan'
           : nameController.text.trim();
 
-      PlanStore.add(SavedPlan(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
+      final plan = SavedPlan(
+        id: _editingPlanId ?? DateTime.now().millisecondsSinceEpoch.toString(),
         name: name,
-        createdAt: DateTime.now(),
+        createdAt: widget.initialPlan?.createdAt ?? DateTime.now(),
         stops: _itinerary
-            .map((p) => StopInfo(name: p.name, color: p.color, emoji: p.emoji))
+            .map((p) => StopInfo(
+                  name: p.name,
+                  color: p.color,
+                  emoji: p.emoji,
+                  category: p.category,
+                ))
             .toList(),
         friendInitials: _invitedFriends.map((f) => f.initials).toList(),
-      ));
+        friendNames: _invitedFriends.map((f) => f.name).toList(),
+      );
+      if (_editingPlanId != null) {
+        PlanStore.update(plan);
+      } else {
+        PlanStore.add(plan);
+      }
 
       Navigator.push(
         context,
@@ -832,11 +937,11 @@ class _PlanScreenState extends State<PlanScreen> {
                           color: const Color(0xFF00C2CC)
                               .withValues(alpha: 0.4)),
                     ),
-                    child: const Icon(
-                      Icons.arrow_downward_rounded,
-                      color: Color(0xFF00C2CC),
-                      size: 20,
-                    ),
+                    // child: const Icon(
+                    //   Icons.arrow_downward_rounded,
+                    //   color: Color(0xFF00C2CC),
+                    //   size: 20,
+                    // ),
                   ),
                 ],
               ),
@@ -875,10 +980,17 @@ class _PlanScreenState extends State<PlanScreen> {
 
 // ── Data models ───────────────────────────────────────────────────────────────
 
-class _FriendAvatar {
+class _FriendData {
+  final String id;
+  final String name;
   final String initials;
   final Color color;
-  const _FriendAvatar({required this.initials, required this.color});
+  const _FriendData({
+    required this.id,
+    required this.name,
+    required this.initials,
+    required this.color,
+  });
 }
 
 class _VibeData {
@@ -909,6 +1021,18 @@ class _PlaceData {
     required this.badgeIcon,
     required this.badgeColor,
   });
+
+  static _PlaceData fromStop(StopInfo s) => _PlaceData(
+        emoji: s.emoji,
+        color: s.color,
+        name: s.name,
+        category: s.category,
+        distance: '',
+        rating: 4.0,
+        badge: 'Saved stop',
+        badgeIcon: Icons.bookmark_rounded,
+        badgeColor: s.color,
+      );
 }
 
 // ── Helper widgets ────────────────────────────────────────────────────────────
@@ -1267,6 +1391,222 @@ class _ActionChip extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ── Contact picker bottom sheet ───────────────────────────────────────────────
+
+class _ContactPickerSheet extends StatefulWidget {
+  final List<Contact> contacts;
+  final Set<String> selectedIds;
+  final List<Color> avatarColors;
+  final void Function(List<_FriendData>) onDone;
+
+  const _ContactPickerSheet({
+    required this.contacts,
+    required this.selectedIds,
+    required this.avatarColors,
+    required this.onDone,
+  });
+
+  @override
+  State<_ContactPickerSheet> createState() => _ContactPickerSheetState();
+}
+
+class _ContactPickerSheetState extends State<_ContactPickerSheet> {
+  late Set<String> _selected;
+  String _query = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _selected = Set.from(widget.selectedIds);
+  }
+
+  String _initials(String name) {
+    final parts = name.trim().split(' ');
+    if (parts.length >= 2) return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    return name.substring(0, name.length.clamp(0, 2)).toUpperCase();
+  }
+
+  List<Contact> get _filtered {
+    if (_query.isEmpty) return widget.contacts;
+    final q = _query.toLowerCase();
+    return widget.contacts
+        .where((c) => c.displayName.toLowerCase().contains(q))
+        .toList();
+  }
+
+  void _done() {
+    final colors = widget.avatarColors;
+    final friends = <_FriendData>[];
+    var colorIndex = 0;
+    for (final c in widget.contacts) {
+      if (_selected.contains(c.id)) {
+        friends.add(_FriendData(
+          id: c.id,
+          name: c.displayName,
+          initials: _initials(c.displayName),
+          color: colors[colorIndex % colors.length],
+        ));
+        colorIndex++;
+      }
+    }
+    widget.onDone(friends);
+    Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.75,
+      maxChildSize: 0.95,
+      minChildSize: 0.5,
+      expand: false,
+      builder: (_, controller) => Column(
+        children: [
+          Container(
+            width: 40,
+            height: 4,
+            margin: const EdgeInsets.symmetric(vertical: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF374151),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'Choose friends',
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+                GestureDetector(
+                  onTap: _done,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF004D52), Color(0xFF00C2CC)],
+                      ),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      'Done${_selected.isNotEmpty ? ' (${_selected.length})' : ''}',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E2D3D),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFF243447)),
+              ),
+              child: TextField(
+                style: const TextStyle(color: Colors.white, fontSize: 14),
+                decoration: const InputDecoration(
+                  hintText: 'Search contacts…',
+                  hintStyle: TextStyle(color: Color(0xFF6B7280)),
+                  prefixIcon: Icon(Icons.search_rounded,
+                      color: Color(0xFF6B7280), size: 20),
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.symmetric(vertical: 12),
+                ),
+                onChanged: (v) => setState(() => _query = v),
+              ),
+            ),
+          ),
+          Expanded(
+            child: _filtered.isEmpty
+                ? const Center(
+                    child: Text('No contacts found',
+                        style: TextStyle(color: Color(0xFF6B7280))))
+                : ListView.builder(
+                    controller: controller,
+                    itemCount: _filtered.length,
+                    itemBuilder: (_, i) {
+                      final c = _filtered[i];
+                      final selected = _selected.contains(c.id);
+                      final initials = _initials(c.displayName);
+                      final color = widget.avatarColors[
+                          c.id.hashCode.abs() % widget.avatarColors.length];
+                      return ListTile(
+                        leading: Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: color,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Center(
+                            child: Text(
+                              initials,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                        title: Text(
+                          c.displayName,
+                          style: const TextStyle(
+                              color: Colors.white, fontSize: 14),
+                        ),
+                        trailing: AnimatedContainer(
+                          duration: const Duration(milliseconds: 150),
+                          width: 24,
+                          height: 24,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: selected
+                                ? const Color(0xFF00C2CC)
+                                : Colors.transparent,
+                            border: Border.all(
+                              color: selected
+                                  ? const Color(0xFF00C2CC)
+                                  : const Color(0xFF374151),
+                              width: 2,
+                            ),
+                          ),
+                          child: selected
+                              ? const Icon(Icons.check_rounded,
+                                  size: 13, color: Colors.white)
+                              : null,
+                        ),
+                        onTap: () => setState(() {
+                          if (selected) {
+                            _selected.remove(c.id);
+                          } else {
+                            _selected.add(c.id);
+                          }
+                        }),
+                      );
+                    },
+                  ),
+          ),
+        ],
       ),
     );
   }
