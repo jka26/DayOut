@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'discover_screen.dart';
 import 'plan_screen.dart';
 import 'save_plan_screen.dart';
 import 'surprise_screen.dart';
+import '../models/app_place.dart';
 import '../services/auth_service.dart';
+import '../services/places_service.dart';
+import '../services/weather_service.dart';
 
 class LandingScreen extends StatefulWidget {
   const LandingScreen({super.key});
@@ -17,8 +21,30 @@ class _LandingScreenState extends State<LandingScreen>
   late AnimationController _controller;
   late Animation<double> _fadeIn;
   late Animation<Offset> _slideUp;
+  // ignore: prefer_final_fields
   int _selectedNavIndex = 0;
   String _displayName = '';
+  int _selectedFilter = 0;
+  List<AppPlace> _livePlaces = [];
+  bool _placesLoading = true;
+  WeatherData? _weather;
+
+  static const _filters = ['All', 'Outdoor', 'Food', 'Indoor'];
+  static const _filterCategories = <int, Set<String>>{
+    1: {'beach', 'park', 'attraction', 'sports', 'garden'},
+    2: {'restaurant', 'cafe', 'nightlife'},
+    3: {'museum', 'shopping', 'arcade', 'entertainment', 'leisure'},
+  };
+
+  List<AppPlace> get _filteredPlaces {
+    if (_selectedFilter == 0) return _livePlaces;
+    final cats = _filterCategories[_selectedFilter];
+    if (cats == null) return _livePlaces;
+    final filtered = _livePlaces
+        .where((p) => cats.contains(p.category.toLowerCase()))
+        .toList();
+    return filtered.isEmpty ? _livePlaces : filtered;
+  }
 
   String get _greeting {
     final hour = DateTime.now().hour;
@@ -36,10 +62,73 @@ class _LandingScreenState extends State<LandingScreen>
     }
   }
 
+  Future<void> _loadPlaces() async {
+    double? deviceLat, deviceLng;
+    try {
+      var perm = await Geolocator.checkPermission();
+      if (perm == LocationPermission.denied) {
+        perm = await Geolocator.requestPermission();
+      }
+      if (perm == LocationPermission.whileInUse ||
+          perm == LocationPermission.always) {
+        final pos = await Geolocator.getCurrentPosition(
+            locationSettings: const LocationSettings(
+                accuracy: LocationAccuracy.low,
+                timeLimit: Duration(seconds: 5)));
+        deviceLat = pos.latitude;
+        deviceLng = pos.longitude;
+      }
+    } catch (_) {}
+    final weather = await WeatherService.fetchAccra();
+    final places = await PlacesService.fetchNearby(
+        weather: weather, lat: deviceLat, lng: deviceLng);
+    if (!mounted) return;
+    setState(() {
+      _weather = weather;
+      _livePlaces = places;
+      _placesLoading = false;
+    });
+  }
+
+  static String _categoryEmoji(String cat) {
+    switch (cat.toLowerCase()) {
+      case 'beach': return '🏖️';
+      case 'park': case 'garden': return '🌿';
+      case 'restaurant': return '🍽️';
+      case 'cafe': return '☕';
+      case 'museum': return '🏛️';
+      case 'arcade': return '🕹️';
+      case 'shopping': return '🛍️';
+      case 'nightlife': return '🍸';
+      case 'attraction': return '📍';
+      case 'entertainment': return '🎭';
+      case 'sports': return '⚽';
+      default: return '📌';
+    }
+  }
+
+  static Color _categoryColor(String cat) {
+    switch (cat.toLowerCase()) {
+      case 'beach': return const Color(0xFF00C2CC);
+      case 'park': case 'garden': return const Color(0xFF22C55E);
+      case 'restaurant': return const Color(0xFFF59E0B);
+      case 'cafe': return const Color(0xFFD97706);
+      case 'museum': return const Color(0xFF6B7280);
+      case 'arcade': return const Color(0xFF7C3AED);
+      case 'shopping': return const Color(0xFF0891B2);
+      case 'nightlife': return const Color(0xFF1D4ED8);
+      case 'attraction': return const Color(0xFFEF4444);
+      case 'entertainment': return const Color(0xFFEC4899);
+      case 'sports': return const Color(0xFF16A34A);
+      default: return const Color(0xFF374151);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     _loadUser();
+    _loadPlaces();
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 700),
@@ -133,14 +222,22 @@ class _LandingScreenState extends State<LandingScreen>
                               Container(
                                 width: 38,
                                 height: 38,
-                                decoration: const BoxDecoration(
-                                  color: Color(0xFFFFB300),
+                                decoration: BoxDecoration(
+                                  color: _weather == null
+                                      ? const Color(0xFFFFB300)
+                                      : _weather!.isOutdoorFriendly
+                                          ? const Color(0xFFFFB300)
+                                          : const Color(0xFF4A90D9),
                                   shape: BoxShape.circle,
                                 ),
-                                child: const Center(
+                                child: Center(
                                   child: Text(
-                                    '☀️',
-                                    style: TextStyle(fontSize: 18),
+                                    _weather == null
+                                        ? '☀️'
+                                        : _weather!.isOutdoorFriendly
+                                            ? '☀️'
+                                            : '🌧️',
+                                    style: const TextStyle(fontSize: 18),
                                   ),
                                 ),
                               ),
@@ -148,16 +245,22 @@ class _LandingScreenState extends State<LandingScreen>
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text(
-                                    '31°C · Sunny',
-                                    style: TextStyle(
+                                  Text(
+                                    _weather == null
+                                        ? 'Loading weather…'
+                                        : '${_weather!.tempCelsius.round()}°C · ${_weather!.description}',
+                                    style: const TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.w700,
                                       color: Colors.white,
                                     ),
                                   ),
                                   Text(
-                                    'Perfect for an outdoor day in Accra!',
+                                    _weather == null
+                                        ? 'Accra, Ghana'
+                                        : _weather!.isOutdoorFriendly
+                                            ? 'Great day for an outdoor outing!'
+                                            : 'Indoor activities recommended today',
                                     style: TextStyle(
                                       fontSize: 12,
                                       color: Colors.white.withValues(alpha: 0.8),
@@ -261,14 +364,13 @@ class _LandingScreenState extends State<LandingScreen>
                               ],
                             ),
                           ),
-                          SingleChildScrollView(
+                          const SingleChildScrollView(
                             scrollDirection: Axis.horizontal,
-                            padding:
-                                const EdgeInsets.symmetric(horizontal: 20),
+                            padding: EdgeInsets.symmetric(horizontal: 20),
                             child: IntrinsicHeight(
                               child: Row(
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: const [
+                                children: [
                                 _CategoryCard(
                                   emoji: '🕹️',
                                   label: 'Arcades',
@@ -303,14 +405,14 @@ class _LandingScreenState extends State<LandingScreen>
 
                           const SizedBox(height: 24),
 
-                          // ── Weather-Matched Today ─────────────────
+                          // ── Nearby Places ─────────────────────────
                           Padding(
                             padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 const Text(
-                                  'Weather-Matched Today',
+                                  'Nearby Places',
                                   style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w700,
@@ -318,9 +420,13 @@ class _LandingScreenState extends State<LandingScreen>
                                   ),
                                 ),
                                 GestureDetector(
-                                  onTap: () {},
+                                  onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                        builder: (_) => const DiscoverScreen()),
+                                  ),
                                   child: const Text(
-                                    'Explore',
+                                    'See all',
                                     style: TextStyle(
                                       fontSize: 13,
                                       fontWeight: FontWeight.w600,
@@ -331,46 +437,92 @@ class _LandingScreenState extends State<LandingScreen>
                               ],
                             ),
                           ),
-                          const Padding(
-                            padding:
-                                EdgeInsets.symmetric(horizontal: 20),
-                            child: Column(
-                              children: [
-                                _LocationCard(
-                                  emoji: '🏖️',
-                                  color: Color(0xFFE91E8C),
-                                  name: 'Labadi Beach',
-                                  category: 'Beach',
-                                  distance: '3.2 km',
-                                  rating: 4.7,
-                                  badge: 'Great today',
-                                  badgeColor: Color(0xFFFFA726),
-                                ),
-                                SizedBox(height: 12),
-                                _LocationCard(
-                                  emoji: '🌿',
-                                  color: Color(0xFF00C2CC),
-                                  name: 'Accra Botanical Garden',
-                                  category: 'Park',
-                                  distance: '5.1 km',
-                                  rating: 4.4,
-                                  badge: 'Ideal',
-                                  badgeColor: Color(0xFF00C2CC),
-                                ),
-                                SizedBox(height: 12),
-                                _LocationCard(
-                                  emoji: '🕹️',
-                                  color: Color(0xFF7C3AED),
-                                  name: 'GameZone Osu',
-                                  category: 'Arcade',
-                                  distance: '1.8 km',
-                                  rating: 4.5,
-                                  badge: 'Indoor',
-                                  badgeColor: Color(0xFF7C3AED),
-                                ),
-                              ],
+                          // Filter tabs
+                          SizedBox(
+                            height: 36,
+                            child: ListView.separated(
+                              scrollDirection: Axis.horizontal,
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 20),
+                              itemCount: _filters.length,
+                              separatorBuilder: (_, __) =>
+                                  const SizedBox(width: 8),
+                              itemBuilder: (_, i) {
+                                final active = _selectedFilter == i;
+                                return GestureDetector(
+                                  onTap: () =>
+                                      setState(() => _selectedFilter = i),
+                                  child: AnimatedContainer(
+                                    duration:
+                                        const Duration(milliseconds: 180),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 16),
+                                    decoration: BoxDecoration(
+                                      color: active
+                                          ? const Color(0xFF00C2CC)
+                                          : const Color(0xFFEEF0F3),
+                                      borderRadius: BorderRadius.circular(18),
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        _filters[i],
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                          color: active
+                                              ? Colors.white
+                                              : const Color(0xFF6B7280),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
                             ),
                           ),
+                          const SizedBox(height: 14),
+                          // Place cards
+                          if (_placesLoading)
+                            const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 32),
+                              child: Center(
+                                child: CircularProgressIndicator(
+                                  color: Color(0xFF00C2CC),
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                            )
+                          else
+                            Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 20),
+                              child: Column(
+                                children: [
+                                  for (int i = 0;
+                                      i <
+                                          _filteredPlaces
+                                              .take(5)
+                                              .length;
+                                      i++) ...[
+                                    _LocationCard(
+                                      emoji: _categoryEmoji(
+                                          _filteredPlaces[i].category),
+                                      color: _categoryColor(
+                                          _filteredPlaces[i].category),
+                                      name: _filteredPlaces[i].name,
+                                      category: _filteredPlaces[i].category,
+                                      distance: _filteredPlaces[i].distanceStr,
+                                      rating: _filteredPlaces[i].displayRating,
+                                      badge: _filteredPlaces[i].badge,
+                                      badgeColor: _filteredPlaces[i].badgeColor,
+                                      thumbnailUrl: _filteredPlaces[i].thumbnailUrl,
+                                    ),
+                                    if (i < _filteredPlaces.take(5).length - 1)
+                                      const SizedBox(height: 12),
+                                  ],
+                                ],
+                              ),
+                            ),
                         ],
                       ),
                     ),
@@ -584,6 +736,7 @@ class _LocationCard extends StatelessWidget {
   final double rating;
   final String badge;
   final Color badgeColor;
+  final String? thumbnailUrl;
 
   const _LocationCard({
     required this.emoji,
@@ -594,7 +747,15 @@ class _LocationCard extends StatelessWidget {
     required this.rating,
     required this.badge,
     required this.badgeColor,
+    this.thumbnailUrl,
   });
+
+  Widget _emojiPlaceholder() => Container(
+        width: 56,
+        height: 56,
+        color: color.withValues(alpha: 0.15),
+        child: Center(child: Text(emoji, style: const TextStyle(fontSize: 22))),
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -613,16 +774,17 @@ class _LocationCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Container(
-            width: 46,
-            height: 46,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Center(
-              child: Text(emoji, style: const TextStyle(fontSize: 22)),
-            ),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: thumbnailUrl != null
+                ? Image.network(
+                    thumbnailUrl!,
+                    width: 56,
+                    height: 56,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => _emojiPlaceholder(),
+                  )
+                : _emojiPlaceholder(),
           ),
           const SizedBox(width: 12),
           Expanded(

@@ -17,8 +17,8 @@ function base64UrlDecode(string $data): string
 
 function jwtEncode(array $payload): string
 {
-    // $secret = getenv('JWT_SECRET') ?: $_ENV['JWT_SECRET'] ?? 'dayout_fallback_secret_change_me';
-    $secret = 'dayout_fallback_secret_change_me';
+    $secret = getenv('JWT_SECRET') ?: ($_ENV['JWT_SECRET'] ?? '');
+    if (empty($secret)) { http_response_code(500); echo json_encode(['error' => 'JWT_SECRET not configured']); exit; }
 
     $header = base64UrlEncode(json_encode(['alg' => 'HS256', 'typ' => 'JWT']));
 
@@ -37,8 +37,8 @@ function jwtEncode(array $payload): string
 
 function jwtDecode(string $token): ?array
 {
-    // $secret = getenv('JWT_SECRET') ?: $_ENV['JWT_SECRET'] ?? 'dayout_fallback_secret_change_me';
-    $secret = 'dayout_fallback_secret_change_me';
+    $secret = getenv('JWT_SECRET') ?: ($_ENV['JWT_SECRET'] ?? '');
+    if (empty($secret)) return null;
 
     $parts = explode('.', $token);
     if (count($parts) !== 3) {

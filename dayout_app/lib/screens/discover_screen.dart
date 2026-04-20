@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../services/weather_service.dart';
 import '../services/places_service.dart';
 import 'food_match_screen.dart';
@@ -29,8 +31,24 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   }
 
   Future<void> _loadPlaces() async {
+    double? deviceLat, deviceLng;
+    try {
+      final permission = await Geolocator.checkPermission() == LocationPermission.denied
+          ? await Geolocator.requestPermission()
+          : await Geolocator.checkPermission();
+      if (permission == LocationPermission.whileInUse ||
+          permission == LocationPermission.always) {
+        final pos = await Geolocator.getCurrentPosition(
+            locationSettings: const LocationSettings(
+                accuracy: LocationAccuracy.low,
+                timeLimit: Duration(seconds: 5)));
+        deviceLat = pos.latitude;
+        deviceLng = pos.longitude;
+      }
+    } catch (_) {}
     final weather = await WeatherService.fetchAccra();
-    final appPlaces = await PlacesService.fetchNearby(weather: weather);
+    final appPlaces = await PlacesService.fetchNearby(
+        weather: weather, lat: deviceLat, lng: deviceLng);
     if (!mounted) return;
     setState(() {
       _livePlaces = appPlaces.map((p) => _PlaceData(
@@ -906,7 +924,17 @@ class _LocationSheet extends StatelessWidget {
                   borderRadius: BorderRadius.circular(25),
                 ),
                 child: TextButton.icon(
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () async {
+                    final geoUri = Uri.parse(
+                        'geo:${place.lat},${place.lng}?q=${place.lat},${place.lng}(${Uri.encodeComponent(place.name)})');
+                    if (await canLaunchUrl(geoUri)) {
+                      await launchUrl(geoUri);
+                    } else {
+                      final webUri = Uri.parse(
+                          'https://www.openstreetmap.org/?mlat=${place.lat}&mlon=${place.lng}&zoom=16');
+                      await launchUrl(webUri, mode: LaunchMode.externalApplication);
+                    }
+                  },
                   icon: const Icon(Icons.directions_rounded,
                       color: Colors.white, size: 18),
                   label: const Text(

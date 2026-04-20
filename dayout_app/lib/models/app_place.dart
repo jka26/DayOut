@@ -10,6 +10,7 @@ class AppPlace {
   final double? rating;       // null until fetched from API
   final int? distanceMeters;  // null if unknown
   final bool isOutdoor;
+  final String? thumbnailUrl; // Wikipedia / Wikimedia image URL
 
   const AppPlace({
     required this.id,
@@ -20,6 +21,7 @@ class AppPlace {
     this.rating,
     this.distanceMeters,
     required this.isOutdoor,
+    this.thumbnailUrl,
   });
 
   // ── Computed display helpers ───────────────────────────────────────────────

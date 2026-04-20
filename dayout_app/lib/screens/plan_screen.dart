@@ -61,6 +61,23 @@ class _PlanScreenState extends State<PlanScreen> {
     _VibeData(icon: Icons.favorite_border_rounded, label: 'Date'),
   ];
 
+  static const _vibeCategories = <int, Set<String>>{
+    1: {'beach', 'park', 'restaurant', 'cafe', 'nature', 'leisure'},
+    2: {'beach', 'park', 'arcade', 'sports', 'nature', 'attraction'},
+    3: {'park', 'museum', 'beach', 'arcade', 'attraction', 'shopping'},
+    4: {'restaurant', 'cafe', 'beach', 'nightlife', 'rooftop', 'leisure'},
+  };
+
+  List<_PlaceData> get _filteredSuggestions {
+    if (_selectedVibe <= 0) return _suggestions;
+    final allowed = _vibeCategories[_selectedVibe];
+    if (allowed == null) return _suggestions;
+    final filtered = _suggestions
+        .where((p) => allowed.contains(p.category.toLowerCase()))
+        .toList();
+    return filtered.isEmpty ? _suggestions : filtered;
+  }
+
   static const _suggestions = [
     _PlaceData(
       emoji: '🏖️',
@@ -362,7 +379,7 @@ class _PlanScreenState extends State<PlanScreen> {
             ),
           ),
         ),
-        ..._suggestions.map((place) => _PlaceCard(
+        ..._filteredSuggestions.map((place) => _PlaceCard(
               place: place,
               added: _itinerary.contains(place),
               onTap: () => _toggle(place),
@@ -611,14 +628,29 @@ class _PlanScreenState extends State<PlanScreen> {
   Future<void> _pickContacts() async {
     final granted = await FlutterContacts.requestPermission();
     if (!granted) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Contacts permission denied')),
-        );
-      }
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        builder: (_) => AlertDialog(
+          backgroundColor: const Color(0xFF162030),
+          title: const Text('Contacts access needed',
+              style: TextStyle(color: Colors.white, fontSize: 16)),
+          content: const Text(
+            'Contacts access was denied. Go to Settings → Apps → DayOut → Permissions and enable Contacts.',
+            style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 14),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK',
+                  style: TextStyle(color: Color(0xFF00C2CC))),
+            ),
+          ],
+        ),
+      );
       return;
     }
-    final contacts = await FlutterContacts.getContacts();
+    final contacts = await FlutterContacts.getContacts(withProperties: true);
     if (!mounted) return;
 
     final selectedIds = _invitedFriends.map((f) => f.id).toSet();
