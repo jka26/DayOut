@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 import 'package:flutter/material.dart';
 
 class FoodMatchScreen extends StatefulWidget {
@@ -30,7 +31,10 @@ class _FoodMatchScreenState extends State<FoodMatchScreen> {
   // ── Data fetching ─────────────────────────────────────────────────────────
 
   Future<void> _fetchMeals() async {
-    // Strip common suffixes to get a searchable keyword
+    // 1. Try African/Kenyan area filter (closest to West African on MealDB)
+    if (await _filterByArea('Kenyan')) return;
+
+    // 2. Try keyword from place name
     final cleaned = widget.locationName
         .replaceAll(
           RegExp(
@@ -40,19 +44,20 @@ class _FoodMatchScreenState extends State<FoodMatchScreen> {
           '',
         )
         .trim();
-    final keyword = cleaned.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).join(' ');
+    final keyword =
+        cleaned.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).join(' ');
+    if (keyword.length > 2 && await _searchMeals(keyword)) return;
 
-    if (await _searchMeals(keyword.isNotEmpty ? keyword : 'chicken')) return;
-
-    // Fallback: filter by popular categories
-    for (final cat in ['Chicken', 'Seafood', 'Beef', 'Vegetarian']) {
+    // 3. Category fallbacks
+    for (final cat in ['Seafood', 'Chicken', 'Beef', 'Vegetarian']) {
       if (await _filterByCategory(cat)) return;
     }
 
-    // Final fallback: static dishes
+    // 4. Static Ghanaian dishes — shuffled for variety
     if (mounted) {
+      final shuffled = List<_Meal>.from(_staticFallback)..shuffle(Random());
       setState(() {
-        _meals = _staticFallback;
+        _meals = shuffled.take(6).toList();
         _offline = true;
         _loading = false;
       });
@@ -78,6 +83,41 @@ class _FoodMatchScreenState extends State<FoodMatchScreen> {
         if (mounted) {
           setState(() {
             _meals = meals.take(8).map((m) => _Meal.fromJson(m)).toList();
+            _loading = false;
+          });
+        }
+        return true;
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  Future<bool> _filterByArea(String area) async {
+    try {
+      final client = HttpClient()
+        ..connectionTimeout = const Duration(seconds: 7);
+      final req = await client.getUrl(
+        Uri.parse('https://www.themealdb.com/api/json/v1/1/filter.php?a=$area'),
+      );
+      final res = await req.close();
+      final body = await res.transform(utf8.decoder).join();
+      client.close();
+
+      final data = jsonDecode(body) as Map;
+      final meals = data['meals'] as List?;
+      if (meals != null && meals.isNotEmpty) {
+        final shuffled = List.from(meals)..shuffle(Random());
+        if (mounted) {
+          setState(() {
+            _meals = shuffled
+                .take(6)
+                .map((m) => _Meal(
+                      name: m['strMeal'] as String? ?? '',
+                      category: area,
+                      area: area,
+                      thumb: m['strMealThumb'] as String? ?? '',
+                    ))
+                .toList();
             _loading = false;
           });
         }
@@ -130,6 +170,18 @@ class _FoodMatchScreenState extends State<FoodMatchScreen> {
     _Meal(name: 'Groundnut Soup', category: 'Soup', area: 'Ghanaian', thumb: ''),
     _Meal(name: 'Waakye', category: 'Rice & Beans', area: 'Ghanaian', thumb: ''),
     _Meal(name: 'Fufu & Light Soup', category: 'Traditional', area: 'Ghanaian', thumb: ''),
+    _Meal(name: 'Banku & Okro Stew', category: 'Traditional', area: 'Ghanaian', thumb: ''),
+    _Meal(name: 'Kontomire Stew', category: 'Soup', area: 'Ghanaian', thumb: ''),
+    _Meal(name: 'Red Red', category: 'Beans Dish', area: 'Ghanaian', thumb: ''),
+    _Meal(name: 'Omo Tuo', category: 'Traditional', area: 'Ghanaian', thumb: ''),
+    _Meal(name: 'Grilled Whole Fish', category: 'Seafood', area: 'Ghanaian', thumb: ''),
+    _Meal(name: 'Roasted Plantain & Groundnuts', category: 'Street Food', area: 'Ghanaian', thumb: ''),
+    _Meal(name: 'Palm Nut Soup', category: 'Soup', area: 'Ghanaian', thumb: ''),
+    _Meal(name: 'Tuo Zaafi', category: 'Traditional', area: 'Ghanaian', thumb: ''),
+    _Meal(name: 'Chinchinga (Suya)', category: 'Street Food', area: 'Ghanaian', thumb: ''),
+    _Meal(name: 'Rice & Stew', category: 'Rice Dish', area: 'Ghanaian', thumb: ''),
+    _Meal(name: 'Eba & Egusi Soup', category: 'West African', area: 'West African', thumb: ''),
+    _Meal(name: 'Puff Puff', category: 'Snack', area: 'West African', thumb: ''),
   ];
 
   // ── Build ─────────────────────────────────────────────────────────────────
