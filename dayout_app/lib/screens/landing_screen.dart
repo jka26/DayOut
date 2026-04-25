@@ -8,6 +8,7 @@ import '../models/app_place.dart';
 import '../services/auth_service.dart';
 import '../services/places_service.dart';
 import '../services/weather_service.dart';
+import '../widgets/logout_button.dart';
 
 class LandingScreen extends StatefulWidget {
   const LandingScreen({super.key});
@@ -187,6 +188,10 @@ class _LandingScreenState extends State<LandingScreen>
                               ),
                             ),
                             const Text('👋', style: TextStyle(fontSize: 14)),
+                            Padding(
+                              padding: const EdgeInsets.only(left: 200),
+                              child: const LogoutButton(),
+                            ),
                           ],
                         ),
                         const SizedBox(height: 6),
