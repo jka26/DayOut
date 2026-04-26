@@ -188,10 +188,8 @@ class _LandingScreenState extends State<LandingScreen>
                               ),
                             ),
                             const Text('👋', style: TextStyle(fontSize: 14)),
-                            Padding(
-                              padding: const EdgeInsets.only(left: 200),
-                              child: const LogoutButton(),
-                            ),
+                            const Spacer(),
+                            const LogoutButton(),
                           ],
                         ),
                         const SizedBox(height: 6),
