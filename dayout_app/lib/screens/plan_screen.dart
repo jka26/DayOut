@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
 import '../models/plan_store.dart';
+import '../services/weather_service.dart';
 import 'food_match_screen.dart';
 import 'fun_facts_screen.dart';
 import 'save_plan_screen.dart';
@@ -21,6 +22,7 @@ class _PlanScreenState extends State<PlanScreen> {
   final Map<_PlaceData, DateTime?> _stopDates = {};
   final List<_FriendData> _invitedFriends = [];
   String? _editingPlanId;
+  WeatherData? _weather;
 
   static const _avatarColors = [
     Color(0xFF00C2CC), Color(0xFFE91E8C), Color(0xFF7C3AED),
@@ -30,6 +32,9 @@ class _PlanScreenState extends State<PlanScreen> {
   @override
   void initState() {
     super.initState();
+    WeatherService.fetchAccra().then((w) {
+      if (mounted) setState(() => _weather = w);
+    });
     final plan = widget.initialPlan;
     if (plan != null) {
       _editingPlanId = plan.id;
@@ -252,32 +257,41 @@ class _PlanScreenState extends State<PlanScreen> {
   // ── Weather banner ────────────────────────────────────────────────────────
 
   Widget _buildWeatherBanner() {
+    final isOutdoor = _weather?.isOutdoorFriendly ?? true;
+    final dotColor = isOutdoor ? const Color(0xFFFFA726) : const Color(0xFF4A90D9);
+    final textColor = isOutdoor ? const Color(0xFF92610A) : const Color(0xFF1E4A7A);
+    final bgColor = isOutdoor ? const Color(0xFFFFFBEB) : const Color(0xFFEFF6FF);
+    final borderColor = isOutdoor ? const Color(0xFFFFE082) : const Color(0xFFBFDBFE);
+    final text = _weather == null
+        ? 'Loading weather…'
+        : _weather!.bannerText;
+
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFFBEB),
+        color: bgColor,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFFFE082)),
+        border: Border.all(color: borderColor),
       ),
       child: Row(
         children: [
           Container(
             width: 8,
             height: 8,
-            decoration: const BoxDecoration(
-              color: Color(0xFFFFA726),
+            decoration: BoxDecoration(
+              color: dotColor,
               shape: BoxShape.circle,
             ),
           ),
           const SizedBox(width: 10),
-          const Expanded(
+          Expanded(
             child: Text(
-              '31°C and sunny — outdoor spots ranked first today',
+              text,
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
-                color: Color(0xFF92610A),
+                color: textColor,
               ),
             ),
           ),
@@ -957,24 +971,24 @@ class _PlanScreenState extends State<PlanScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  Container(
-                    width: 50,
-                    height: 50,
-                    decoration: BoxDecoration(
-                      color:
-                          const Color(0xFF00C2CC).withValues(alpha: 0.12),
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                          color: const Color(0xFF00C2CC)
-                              .withValues(alpha: 0.4)),
-                    ),
+                  // const SizedBox(width: 10),
+                  // Container(
+                  //   width: 50,
+                  //   height: 50,
+                  //   decoration: BoxDecoration(
+                  //     color:
+                  //         const Color(0xFF00C2CC).withValues(alpha: 0.12),
+                  //     shape: BoxShape.circle,
+                  //     border: Border.all(
+                  //         color: const Color(0xFF00C2CC)
+                  //             .withValues(alpha: 0.4)),
+                  //   ),
                     // child: const Icon(
                     //   Icons.arrow_downward_rounded,
                     //   color: Color(0xFF00C2CC),
                     //   size: 20,
                     // ),
-                  ),
+                  
                 ],
               ),
               const SizedBox(height: 8),
