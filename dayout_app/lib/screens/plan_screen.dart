@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
 import '../models/plan_store.dart';
 import '../services/weather_service.dart';
+import '../services/wiki_image_service.dart';
 import 'food_match_screen.dart';
 import 'fun_facts_screen.dart';
 import 'save_plan_screen.dart';
@@ -35,6 +36,7 @@ class _PlanScreenState extends State<PlanScreen> {
     WeatherService.fetchAccra().then((w) {
       if (mounted) setState(() => _weather = w);
     });
+    _loadSuggestionImages();
     final plan = widget.initialPlan;
     if (plan != null) {
       _editingPlanId = plan.id;
@@ -56,6 +58,14 @@ class _PlanScreenState extends State<PlanScreen> {
         ));
       }
     }
+  }
+
+  Future<void> _loadSuggestionImages() async {
+    final updated = await Future.wait(_suggestions.map((p) async {
+      final url = await WikiImageService.fetchByName(p.name);
+      return url != null ? p.copyWith(thumbnailUrl: url) : p;
+    }));
+    if (mounted) setState(() => _suggestions = updated);
   }
 
   static const _vibes = [
@@ -83,7 +93,7 @@ class _PlanScreenState extends State<PlanScreen> {
     return filtered.isEmpty ? _suggestions : filtered;
   }
 
-  static const _suggestions = [
+  List<_PlaceData> _suggestions = const [
     _PlaceData(
       emoji: '🏖️',
       color: Color(0xFF00C2CC),
@@ -1055,6 +1065,7 @@ class _PlaceData {
   final String badge;
   final IconData badgeIcon;
   final Color badgeColor;
+  final String? thumbnailUrl;
 
   const _PlaceData({
     required this.emoji,
@@ -1066,7 +1077,21 @@ class _PlaceData {
     required this.badge,
     required this.badgeIcon,
     required this.badgeColor,
+    this.thumbnailUrl,
   });
+
+  _PlaceData copyWith({String? thumbnailUrl}) => _PlaceData(
+        emoji: emoji,
+        color: color,
+        name: name,
+        category: category,
+        distance: distance,
+        rating: rating,
+        badge: badge,
+        badgeIcon: badgeIcon,
+        badgeColor: badgeColor,
+        thumbnailUrl: thumbnailUrl ?? this.thumbnailUrl,
+      );
 
   static _PlaceData fromStop(StopInfo s) => _PlaceData(
         emoji: s.emoji,
@@ -1227,6 +1252,13 @@ class _PlaceCard extends StatelessWidget {
     required this.onTap,
   });
 
+  Widget _emojiBox({required _PlaceData place}) => Container(
+        width: 48,
+        height: 48,
+        color: place.color.withValues(alpha: 0.18),
+        child: Center(child: Text(place.emoji, style: const TextStyle(fontSize: 22))),
+      );
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -1246,18 +1278,18 @@ class _PlaceCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              // Icon
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: place.color.withValues(alpha: 0.18),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Center(
-                  child: Text(place.emoji,
-                      style: const TextStyle(fontSize: 22)),
-                ),
+              // Icon / thumbnail
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: place.thumbnailUrl != null
+                    ? Image.network(
+                        place.thumbnailUrl!,
+                        width: 48,
+                        height: 48,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => _emojiBox(place: place),
+                      )
+                    : _emojiBox(place: place),
               ),
               const SizedBox(width: 12),
               // Details

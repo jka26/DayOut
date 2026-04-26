@@ -63,6 +63,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
             social: p.socialText,
             lat: p.lat,
             lng: p.lng,
+            thumbnailUrl: p.thumbnailUrl,
           )).toList();
       _placesLoading = false;
     });
@@ -322,19 +323,19 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                       ],
                     ),
                   ),
-                  Container(
-                    width: 42,
-                    height: 42,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF00C2CC).withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(
-                      Icons.tune_rounded,
-                      color: Color(0xFF00C2CC),
-                      size: 20,
-                    ),
-                  ),
+                  // Container(
+                  //   width: 42,
+                  //   height: 42,
+                  //   decoration: BoxDecoration(
+                  //     color: const Color(0xFF00C2CC).withValues(alpha: 0.1),
+                  //     borderRadius: BorderRadius.circular(12),
+                  //   ),
+                  //   child: const Icon(
+                  //     Icons.tune_rounded,
+                  //     color: Color(0xFF00C2CC),
+                  //     size: 20,
+                  //   ),
+                  // ),
                 ],
               ),
               const SizedBox(height: 14),
@@ -532,15 +533,24 @@ class _PlaceCard extends StatelessWidget {
                   ),
                 ),
                 child: Stack(
+                  fit: StackFit.expand,
                   children: [
-                    // Watermark icon
-                    Center(
-                      child: Icon(
-                        place.icon,
-                        size: 90,
-                        color: Colors.white.withValues(alpha: 0.12),
+                    // Wiki image (covers gradient when available)
+                    if (place.thumbnailUrl != null)
+                      Image.network(
+                        place.thumbnailUrl!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                       ),
-                    ),
+                    // Watermark icon (shown only when no image)
+                    if (place.thumbnailUrl == null)
+                      Center(
+                        child: Icon(
+                          place.icon,
+                          size: 90,
+                          color: Colors.white.withValues(alpha: 0.12),
+                        ),
+                      ),
                     // Badge
                     Positioned(
                       top: 12,
@@ -971,6 +981,7 @@ class _PlaceData {
   final String social;
   final double lat;
   final double lng;
+  final String? thumbnailUrl;
 
   const _PlaceData({
     required this.name,
@@ -984,6 +995,7 @@ class _PlaceData {
     required this.social,
     required this.lat,
     required this.lng,
+    this.thumbnailUrl,
   });
 }
 
