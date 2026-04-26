@@ -34,10 +34,9 @@ class _SurpriseScreenState extends State<SurpriseScreen> {
   ];
 
   static const _budgetOptions = [
-    'Under GH₵50',
-    'GH₵50 – 150',
-    'GH₵150 – 300',
-    'No limit 🤙',
+    ('💰', 'Budget-Friendly'),
+    ('💵', 'Moderate'),
+    ('💎', 'No Limit'),
   ];
 
   bool _loading = false;
@@ -332,18 +331,48 @@ class _SurpriseScreenState extends State<SurpriseScreen> {
     );
   }
 
-  // ── Budget options (single-select list) ──────────────────────────────────
+  // ── Budget options (3-card row) ───────────────────────────────────────────
 
   Widget _buildBudgetOptions() {
-    return Column(
+    return Row(
       children: List.generate(_budgetOptions.length, (i) {
+        final (emoji, label) = _budgetOptions[i];
         final selected = _selectedBudget == i;
-        return GestureDetector(
-          onTap: () => setState(() => _selectedBudget = i),
-          child: _OptionCard(
-            label: _budgetOptions[i],
-            selected: selected,
-            singleSelect: true,
+        return Expanded(
+          child: GestureDetector(
+            onTap: () => setState(() => _selectedBudget = i),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              margin: EdgeInsets.only(right: i < _budgetOptions.length - 1 ? 10 : 0),
+              padding: const EdgeInsets.symmetric(vertical: 18),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: selected ? const Color(0xFF00C2CC) : const Color(0xFFE5E7EB),
+                  width: selected ? 2 : 1,
+                ),
+                boxShadow: selected
+                    ? [BoxShadow(color: const Color(0xFF00C2CC).withValues(alpha: 0.15), blurRadius: 8, offset: const Offset(0, 2))]
+                    : [const BoxShadow(color: Color(0x0A000000), blurRadius: 4, offset: Offset(0, 1))],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(emoji, style: const TextStyle(fontSize: 28)),
+                  const SizedBox(height: 8),
+                  Text(
+                    label,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: selected ? const Color(0xFF004D52) : const Color(0xFF374151),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         );
       }),
@@ -451,12 +480,10 @@ class _SurpriseScreenState extends State<SurpriseScreen> {
 class _OptionCard extends StatelessWidget {
   final String label;
   final bool selected;
-  final bool singleSelect;
 
   const _OptionCard({
     required this.label,
     required this.selected,
-    this.singleSelect = false,
   });
 
   @override
@@ -494,9 +521,8 @@ class _OptionCard extends StatelessWidget {
             width: 22,
             height: 22,
             decoration: BoxDecoration(
-              shape: singleSelect ? BoxShape.circle : BoxShape.rectangle,
-              borderRadius:
-                  singleSelect ? null : BorderRadius.circular(6),
+              shape: BoxShape.rectangle,
+              borderRadius: BorderRadius.circular(6),
               color: selected
                   ? const Color(0xFF00C2CC)
                   : Colors.transparent,

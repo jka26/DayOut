@@ -324,10 +324,9 @@ class SurprisePlannerService {
   }) {
     // 1. Determine max price tier from budget
     final maxTier = switch (budgetIndex) {
-      0 => 1, // Under GH₵50
-      1 => 2, // GH₵50–150
-      2 => 2, // GH₵150–300 (still mid, premium is very high)
-      _ => 3, // No limit
+      0 => 1, // Budget-Friendly
+      1 => 2, // Moderate
+      _ => 3, // No Limit
     };
 
     // 2. Collect active vibe tags
@@ -358,7 +357,7 @@ class SurprisePlannerService {
       ..sort((a, b) => b.$2.compareTo(a.$2));
 
     // 5. Pick stops ensuring category variety
-    final numStops = budgetIndex == 0 ? 2 : (budgetIndex >= 3 ? 4 : 3);
+    final numStops = budgetIndex == 0 ? 2 : (budgetIndex == 2 ? 4 : 3);
     final picked = <_Place>[];
     final usedCategories = <String>{};
 
